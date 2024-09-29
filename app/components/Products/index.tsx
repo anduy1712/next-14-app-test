@@ -1,25 +1,24 @@
 "use client";
 
-import { Product } from "@/app/domain/models/product";
+import { products } from "@/app/actions";
 import { productService } from "@/app/domain/services/product-service";
 import { productRepository } from "@/app/infrastructure/repositories/product-repository";
-import React, { useEffect } from "react";
+import useSWR from "swr";
 
 const Products = () => {
-  const [products, setProducts] = React.useState<Product[]>([]);
+  const { data, isLoading, error } = useSWR("products", () =>
+    products()
+  );
 
-  const fetchProducts = async () => {
-    const data = await productService(productRepository).getAll();
-    console.log("data", data);
-    setProducts(data);
-  };
-  useEffect(() => {
-    fetchProducts();
-  }, []);
+  if (isLoading) {
+    return <p>Loading...</p>;
+  }
+
   return (
     <div>
-      <h1>{products.length > 0 && products[0].productTitle}</h1>
-      <p>test 12345</p>
+      {data?.map((item, index) => (
+        <h1 key={index}>{item.productTitle}</h1>
+      ))}
     </div>
   );
 };

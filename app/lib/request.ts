@@ -1,8 +1,9 @@
 // import { cookies } from "next/headers";
 import Cookies from "js-cookie";
-type Options = Omit<RequestInit, "method"> & {
+export type Options = Omit<RequestInit, "method" | "body"> & {
   baseURL?: string | undefined;
   isAuth?: boolean;
+  body?: {};
 };
 
 export type ResultDTO<T> = {
@@ -10,52 +11,58 @@ export type ResultDTO<T> = {
   data: T;
 };
 
+export type Tokens = {
+  token: string;
+  refreshToken: string;
+};
+
 // const CHAT_SERVICE_URL = process.env.NEXT_PUBLIC_CHAT_SERVICE_URL as string;
 const SERVICE_URL = "https://dummyjson.com";
+const baseHeaders: {
+  [key: string]: string;
+} = {
+  "Content-Type": "application/json",
+};
+export const isClient = typeof window !== "undefined";
 
 export const request = async <T>(
   method: "GET" | "POST" | "PUT" | "DELETE",
   url: string,
   options: Options = { isAuth: true }
-) => {
+): Promise<ResultDTO<T>> => {
   const body = options?.body ? JSON.stringify(options.body) : undefined;
-  const baseHeaders = {
-    "Content-Type": "application/json",
-  };
   let baseURL = SERVICE_URL;
+  let path = `${baseURL}/${url}`;
+
+  const isAuthUrl = ["/auth/login"].some((authUrl) => authUrl === url);
 
   if (options?.baseURL) {
     baseURL = options.baseURL;
   }
 
-  let path = `${baseURL}/${url}`;
-
-  console.log(path);
   if (url.startsWith("/")) {
     path = `${baseURL}${url}`;
-    console.log("cut url", path);
   }
 
-  const token = Cookies.get("token");
+  if (isClient && options.isAuth) {
+    const token = Cookies.get("token");
+    baseHeaders.Authorization = `Bearer ${token}`;
+  }
 
   const res = await fetch(path, {
-    ...options,
     method,
     headers: {
       ...baseHeaders,
-      ...(options.isAuth &&
-        token && {
-          Authorization: `Bearer ${token}`,
-        }),
     },
+    ...options,
     body,
   });
 
   const data = (await res.json()) as T;
-
-  if (data?.token) {
-    Cookies.set("token", data.token);
-    Cookies.set("refreshToken", data.refreshToken);
+  // TODO: may need to be improved here
+  if (isAuthUrl) {
+    Cookies.set("token", (data as Tokens).token);
+    Cookies.set("refreshToken", (data as Tokens).refreshToken);
   }
 
   let result: ResultDTO<T> = {
@@ -63,33 +70,34 @@ export const request = async <T>(
     data,
   };
 
+  // Interceptor for handling 401 responses
   if (!res.ok) {
     if (res.status === 401) {
-      //GET NEW TOKEN
+      // Attempt to refresh the tokens
       const refreshToken = Cookies.get("refreshToken");
-      const newResponse = await request<{
-        token: string;
-        refreshToken: string;
-      }>("POST", "/auth/refresh", {
-        body: { refreshToken },
+      const newTokens = await request<Tokens>("POST", "/auth/refresh", {
+        body: { refreshToken: "dsdsdsds" },
       });
 
-      const { data } = newResponse;
+      const { data } = newTokens;
 
-      if (data.token) {
-        //CALL API AGAIN
-        const newRs = await request<T>(method, url, {
-          headers: {
-            Authorization: "Bearer " + data.token,
-          },
-        });
-
-        result = newRs;
-        return result;
+      // If successful, save the new tokens and retry the original request
+      if ("token" in data) {
+        Cookies.set("token", data.token);
+        Cookies.set("refreshToken", data.refreshToken);
+        return await request<T>(method, url, options);
       }
+
+      console.log('newTokens', newTokens)
+      // If token refresh fails, return the error response
+      throw new Error("Token refresh failed");
+      return {
+        status: newTokens.status,
+        data: "refresh token invalid, please try again" as T,
+      };
     }
 
-    throw new Error("Some thing wrong");
+    return result;
   }
 
   return result;

@@ -1,9 +1,7 @@
-import { useState } from "react";
-import "./styles.css";
-import useLocalStorage from "../hooks/useLocalStorage";
 import ComponentA from "../components/ComponentA";
 import ComponentB from "../components/ComponentB";
-import { ClientOnly } from "../components/ClientOnly";
+import ComponentC from "../components/ComponentC";
+import "./styles.css";
 
 type Conversation = {
   id: string;
@@ -24,8 +22,13 @@ const defaultValue: Conversation = {
 export default function Page() {
   return (
     <div className="blog">
-      <ComponentA />
-      <ComponentB />
+      <div style={{ display: "flex" }}>
+        <ComponentA />
+        {/* <ComponentB /> */}
+        {/* <ComponentC /> */}
+      </div>
+
+      {/* <Popper/> */}
     </div>
   );
 }

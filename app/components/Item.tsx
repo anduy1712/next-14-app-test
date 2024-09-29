@@ -1,6 +1,6 @@
 import React, { memo } from "react";
 
-const Item = ({ name }) => {
+const Item = ({ name }: any) => {
   return <div>{name}</div>;
 };
 

@@ -1,43 +1,67 @@
-import { useState, useEffect } from "react";
+import {
+  useEffect,
+  useSyncExternalStore,
+  useCallback,
+  SetStateAction,
+  Dispatch,
+} from "react";
+import { localStorageImpl } from "../lib/utils";
 
-function getStorageValue<T>(key: string, defaultValue: T) {
-  // this window object is not available on the SSR
-  if (typeof window !== "undefined") {
-    const saved = localStorage.getItem(key);
-    const initial = saved !== null ? JSON.parse(saved) : defaultValue;
-    return initial;
-  }
+const isFunction = <T,>(
+  value: T | ((prevState: T) => T)
+): value is (prevState: T) => T => typeof value === "function";
 
-}
+const getLocalStorageItem = (key: string) => window.localStorage.getItem(key);
 
-export default function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T) => void] {
-  const [value, setValue] = useState(defaultValue);
+const localStorageSubscribe = (cb: () => void) => {
+  window.addEventListener("storage", cb);
+  return () => window.removeEventListener("storage", cb);
+};
 
-  const setValueFnc = (value: T) => {
-    try {
-      setValue(value);
-      window.localStorage.setItem(key, JSON.stringify(value));
-      window.dispatchEvent(new Event("storage"));
-    } catch (error) {
-      console.warn(`Error setting localStorage key "${key}":`, error);
-    }
-  };
+const useLocalStorage = <T,>(
+  key: string,
+  initialValue: T
+): [T, Dispatch<SetStateAction<T>>] => {
+  const getSnapshot = () => getLocalStorageItem(key);
+  const store = useSyncExternalStore(
+    localStorageSubscribe,
+    getSnapshot,
+    () => null
+  );
+
+  const setState = useCallback(
+    (v: SetStateAction<T>) => {
+      try {
+        let nextState;
+        if (isFunction(v)) {
+          const parsedStore = store ? JSON.parse(store) : null;
+          nextState = (v as (prevValue: T) => T)(parsedStore ?? initialValue);
+        } else {
+          nextState = v;
+        }
+
+        if (nextState === undefined || nextState === null) {
+          localStorageImpl.remove(key);
+        } else {
+          localStorageImpl.save(key, nextState);
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    },
+    [key, store, initialValue]
+  );
 
   useEffect(() => {
-    const item = window.localStorage.getItem(key)
-    if (item) {
-      setValue(JSON.parse(item))
+    if (
+      getLocalStorageItem(key) === null &&
+      typeof initialValue !== "undefined"
+    ) {
+      localStorageImpl.save(key, initialValue);
     }
+  }, [key, initialValue]);
 
-    const listenStorageChange = () => {
-      const item = window.localStorage.getItem(key);
-      if (item) {
-        setValue(JSON.parse(item));
-      }
-    };
-    window.addEventListener("storage", listenStorageChange);
-    return () => window.removeEventListener("storage", listenStorageChange);
-  }, []);
+  return [store ? JSON.parse(store) : initialValue, setState];
+};
 
-  return [value, setValueFnc] ;
-}
+export default useLocalStorage;

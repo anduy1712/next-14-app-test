@@ -1,6 +1,7 @@
 import { TAuthRepository } from "@/app/domain/repositories/auth-repository";
 import { TGetMeDTO, TLoginResponseDTO } from "../http/dto/authDTO";
 import { http } from "../instances/http";
+import { toast } from "react-toastify";
 
 export const authRepository: TAuthRepository = {
   login: async (params) => {
@@ -11,9 +12,7 @@ export const authRepository: TAuthRepository = {
     return rs;
   },
   me: async () => {
-    const rs = await http.get<TGetMeDTO>(
-      "auth/me"
-    );
+    const rs = await http.get<TGetMeDTO>("auth/me");
     return rs;
   },
 };

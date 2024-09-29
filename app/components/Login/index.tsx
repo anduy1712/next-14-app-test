@@ -14,6 +14,7 @@ const Login = () => {
     const params = {
       username: name,
       password,
+      expiresInMins: 1,
     };
     const { status } = await authService(authRepository).login(params);
     console.log({ params });

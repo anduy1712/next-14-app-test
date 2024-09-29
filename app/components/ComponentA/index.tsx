@@ -1,67 +1,63 @@
 "use client";
 
-// import useLocalStorage from "@/app/hooks/useLocalStorage";
-import React, { useEffect, useState } from "react";
-
-import "./styles.css";
-import Item from "../Item";
 import useLocalStorage from "@/app/hooks/useLocalStorage";
-import { httpClient, request } from "@/app/lib/request";
-import { fetchTodo } from "@/app/actions/todo";
+// import useLocalStorage from "@/app/hooks/use-local-storage";
+import "./styles.css";
+import { useEffect, useState } from "react";
+import { CustomError, THttpError } from "@/app/lib/type";
+import { fetchTodoError } from "@/app/actions";
 
 const defaultValue = [
   {
-    id: 1,
+    id: "1",
     name: "List item 1",
   },
 ];
 
 const ComponentA = () => {
-  const [list, setList] = useLocalStorage<{ id: number; name: string }[]>(
+  const [state, setState] = useState(false);
+  const [list, setList] = useLocalStorage<{ id: string; name: string }[]>(
     "list",
-    defaultValue
+    []
   );
 
-  const [data, setData] = useState([]);
-  const handleAddItem = () => {
-    fetchTodoData();
+  const handleSetList = () => {
+    setList((prevList) => [
+      ...prevList,
+      {
+        id: new Date().toString(),
+        name: `List item ${new Date()}`,
+      },
+    ]);
   };
 
-  const handleAddItem2 = () => {
-    fetchTodoData2();
-  };
-
-  const fetchTodoData = async () => {
-    const rs = await fetchTodo();
-    const { data } = rs;
-
-    setData(data);
-  };
-
-  const fetchTodoData2 = async () => {
-    const rs = await httpClient.get("/posts");
-    console.log({ rs });
-    const { data } = rs;
-
-    setData(data);
+  const doSomething = async () => {
+    try {
+      const test = await fetchTodoError();
+    } catch (error: any) {
+      // get error.message
+      console.log("yeah 2", error.message);
+      // can't get error.status
+      console.log("yeah 2", error.status);
+    }
   };
 
   useEffect(() => {
-    // fetchTodoData();
-    // const data = fetchTodoData()
+    doSomething();
   }, []);
+  console.log("redner component A", list);
 
-  console.log("comp a render");
   return (
     <div className="box">
       ComponentA:
       <div>
-        {data.map((item: any) => {
-          return <Item key={item.id} name={item.title} />;
-        })}
+        {list.map((item) => (
+          <div style={{ border: "4px solid blue" }} key={item.id}>
+            {item.name}
+          </div>
+        ))}
       </div>
-      <button onClick={handleAddItem}>Click call api server a</button>
-      <button onClick={handleAddItem2}>Click call api client a</button>
+      <button onClick={handleSetList}>Add item in list</button>
     </div>
   );
 };
